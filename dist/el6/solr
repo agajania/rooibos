@@ -1,0 +1,36 @@
+#!/bin/sh -e 
+
+# Starts, stops, and restarts solr 
+#chkconfig: 2345 85 05
+#description: Solr is an open source enterprise search platform from the Apache Lucene project.  It was installed for MDID3.
+
+SOLR_DIR="/var/local/mdid/solr" 
+JAVA_OPTIONS="-DSTOP.PORT=8982 -DSTOP.KEY=1btw7jo0sii2o -jar start.jar " 
+LOG_FILE="/var/local/mdid/solr/logs/startup.log" 
+JAVA="/usr/bin/java" 
+pidfile="/var/run/solr.pid"
+lockfile="/var/lock/subsys/solr"
+
+case $1 in 
+    start) 
+        echo "Starting Solr" 
+        daemonize -u mdid -c $SOLR_DIR -p $pidfile -l $lockfile -e $LOG_FILE $JAVA $JAVA_OPTIONS
+        ;; 
+    stop) 
+        echo "Stopping Solr" 
+        cd $SOLR_DIR 
+        $JAVA $JAVA_OPTIONS --stop 
+        [ -f $pidfile ] && /bin/rm -f $pidfile
+	[ -f $lockfile ] && /bin/rm -f $lockfile
+        ;; 
+    restart) 
+        $0 stop 
+        sleep 1 
+        $0 start 
+        ;; 
+    *) 
+        echo "Usage: $0 {start|stop|restart}" >&2 
+        exit 1 
+        ;; 
+esac
+
