@@ -1,0 +1,109 @@
+#!/bin/sh
+#
+# runworkers          Start/Stop the MDID3 runworkers daemon.
+#
+# chkconfig: 2345 85 05
+# description: runworkers processes jobs for MDID3.  These include tasks \
+#              in rabbitmq and solr indexing.
+
+### BEGIN INIT INFO
+# Provides:
+# Required-Start: $local_fs $syslog
+# Required-Stop: $local_fs $syslog
+# Default-Start:  2345
+# Default-Stop: 5
+# Short-Description: run MDID3 runworkers daemon
+# Description:  runworkers processes jobs for MDID3.  These include tasks
+#               in rabbitmq and solr indexing.
+### END INIT INFO
+
+[ -f /etc/sysconfig/runworkers ] || { 
+    [ "$1" = "status" ] && exit 4 || exit 6 
+}
+
+RETVAL=0
+ROOIBOS_DIR=/var/local/mdid/rooibos
+name=runworkers
+script="${ROOIBOS_DIR}/manage.py"
+prog="/usr/bin/python manage.py runworkers"
+lockfile=/var/lock/subsys/runworkers
+pidfile=/var/run/runworkers
+config=/etc/sysconfig/runworkers
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+[ $UID -eq 0 ] && [ -e /etc/sysconfig/$name ] && . /etc/sysconfig/$name
+
+start() {
+    if [ $UID -ne 0 ] ; then
+        echo "User has insufficient privilege."
+        exit 4
+    fi
+    [ -f $script ] || exit 5
+    [ -f $config ] || exit 6
+    echo -n $"Starting $name: "
+    cd $ROOIBOS_DIR
+    daemonize -u mdid -p $pidfile -l $lockfile -c $ROOIBOS_DIR $prog $RUNWORKERSARGS
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+}
+
+stop() {
+    if [ $UID -ne 0 ] ; then
+        echo "User has insufficient privilege."
+        exit 4
+    fi
+    echo -n $"Stopping ${name}: "
+	if [ -n "$name" ]; then
+		killproc -p $pidfile
+		RETVAL=3
+	else
+		failure $"Stopping $name"
+	fi
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+}
+
+restart() {
+    rh_status_q && stop
+    start
+}
+
+rh_status() {
+    # run checks to determine if the service is running or use generic status
+    status -p $pidfile $name
+}
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+
+case "$1" in
+    start)
+        rh_status_q && exit 0
+        $1
+        ;;
+    stop)
+        rh_status_q || exit 0
+        $1
+        ;;
+    restart)
+        $1
+        ;;
+    status)
+        rh_status
+        ;;
+    condrestart|try-restart)
+        rh_status_q || exit 0
+        restart
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+        exit 2
+esac
+exit $?
+
